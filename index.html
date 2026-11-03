@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steam Guard</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background:#1b1b1b; color:#eee; display:flex; flex-direction:column; align-items:center; padding:40px 16px; }
+  #code { font-size:48px; letter-spacing:8px; font-weight:bold; margin:24px 0 8px; font-family:monospace; }
+  #bar { width:100%; max-width:360px; height:6px; background:#333; border-radius:3px; overflow:hidden; margin-bottom:24px; }
+  #fill { height:100%; background:#4caf50; width:100%; transition:width 1s linear; }
+  .note { font-size:12px; color:#777; max-width:360px; text-align:center; margin-top:16px; }
+</style>
+</head>
+<body>
+<div id="code">------</div>
+<div id="bar"><div id="fill"></div></div>
+<div class="note">Секрет читается из адресной строки после "#", по сети не уходит. Эта страница сама по себе ничего не хранит.</div>
+
+<script>
+const CHARS = "23456789BCDFGHJKMNPQRTVWXY";
+const codeEl = document.getElementById('code');
+const fillEl = document.getElementById('fill');
+
+function getSecret() {
+  const m = location.hash.match(/secret=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function b64decode(str) {
+  const bin = atob(str.trim());
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function generateCode(sharedSecret, timestamp) {
+  const keyBytes = b64decode(sharedSecret);
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const t = Math.floor(timestamp / 30);
+  const msg = new Uint8Array(8);
+  const view = new DataView(msg.buffer);
+  view.setUint32(0, Math.floor(t / 0x100000000));
+  view.setUint32(4, t >>> 0);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, msg));
+  const offset = sig[19] & 0x0f;
+  let codeInt = ((sig[offset] & 0x7f) << 24) | (sig[offset + 1] << 16) | (sig[offset + 2] << 8) | sig[offset + 3];
+  codeInt = codeInt >>> 0;
+  let code = '';
+  for (let i = 0; i < 5; i++) {
+    code += CHARS[codeInt % CHARS.length];
+    codeInt = Math.floor(codeInt / CHARS.length);
+  }
+  return code;
+}
+
+async function tick() {
+  const now = Date.now() / 1000;
+  const remaining = 30 - Math.floor(now % 30);
+  fillEl.style.width = (remaining / 30 * 100) + '%';
+  const secret = getSecret();
+  if (!secret) { codeEl.textContent = 'нет секрета'; return; }
+  try {
+    codeEl.textContent = await generateCode(secret, now);
+  } catch (e) {
+    codeEl.textContent = 'ошибка';
+  }
+}
+setInterval(tick, 1000);
+tick();
+</script>
+</body>
+</html>
