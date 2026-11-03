@@ -3,24 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Steam Guard</title>
+<title>.</title>
 <style>
-  body { font-family: -apple-system, system-ui, sans-serif; background:#1b1b1b; color:#eee; display:flex; flex-direction:column; align-items:center; padding:40px 16px; }
-  #code { font-size:48px; letter-spacing:8px; font-weight:bold; margin:24px 0 8px; font-family:monospace; }
-  #bar { width:100%; max-width:360px; height:6px; background:#333; border-radius:3px; overflow:hidden; margin-bottom:24px; }
-  #fill { height:100%; background:#4caf50; width:100%; transition:width 1s linear; }
-  .note { font-size:12px; color:#777; max-width:360px; text-align:center; margin-top:16px; }
+  body { font-family: -apple-system, system-ui, sans-serif; background:#1b1b1b; color:#eee; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; }
+  button { font-size:20px; padding:20px 40px; border-radius:10px; border:none; background:#4caf50; color:#fff; cursor:pointer; }
+  button:active { background:#3d8b40; }
+  #status { font-size:14px; color:#888; margin-top:16px; height:20px; }
 </style>
 </head>
 <body>
-<div id="code">------</div>
-<div id="bar"><div id="fill"></div></div>
-<div class="note">Секрет читается из адресной строки после "#", по сети не уходит. Эта страница сама по себе ничего не хранит.</div>
+<button id="btn">Copy</button>
+<div id="status"></div>
 
 <script>
 const CHARS = "23456789BCDFGHJKMNPQRTVWXY";
-const codeEl = document.getElementById('code');
-const fillEl = document.getElementById('fill');
+const statusEl = document.getElementById('status');
 
 function getSecret() {
   const m = location.hash.match(/secret=([^&]+)/);
@@ -54,20 +51,18 @@ async function generateCode(sharedSecret, timestamp) {
   return code;
 }
 
-async function tick() {
-  const now = Date.now() / 1000;
-  const remaining = 30 - Math.floor(now % 30);
-  fillEl.style.width = (remaining / 30 * 100) + '%';
+document.getElementById('btn').addEventListener('click', async () => {
   const secret = getSecret();
-  if (!secret) { codeEl.textContent = 'нет секрета'; return; }
+  if (!secret) { statusEl.textContent = 'нет секрета'; return; }
   try {
-    codeEl.textContent = await generateCode(secret, now);
+    const code = await generateCode(secret, Date.now() / 1000);
+    await navigator.clipboard.writeText(code);
+    statusEl.textContent = 'скопировано';
+    setTimeout(() => { statusEl.textContent = ''; }, 1500);
   } catch (e) {
-    codeEl.textContent = 'ошибка';
+    statusEl.textContent = 'ошибка';
   }
-}
-setInterval(tick, 1000);
-tick();
+});
 </script>
 </body>
 </html>
